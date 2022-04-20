@@ -6,8 +6,8 @@
     "description": "Extensions for PyRevit",
     "author": "Gui Talarico",
     "author_profile": "https://github.com/MenghuiZhang",
-    "url": "https://github.com/MenghuiZhang/pyRevit.git",
-    "website": "https://github.com/MenghuiZhang/pyRevit",
+    "url": "https://github.com/MenghuiZhang/pyIGF.git",
+    "website": "https://github.com/MenghuiZhang/pyIGF",
     "image": "",
     "dependencies": []
 }
