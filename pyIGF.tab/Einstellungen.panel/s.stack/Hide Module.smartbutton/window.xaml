@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="Module ausblenden" Height="450" Width="450" Background="SkyBlue">
+        Title="Module einblenden" Height="450" Width="450" Background="SkyBlue">
     <Grid Margin="5">
         <Grid.ColumnDefinitions>
             <ColumnDefinition/>

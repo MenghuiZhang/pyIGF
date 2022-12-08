@@ -1,18 +1,11 @@
 # coding: utf8
-import sys
-sys.path.append(r'R:\pyRevit\xx_Skripte\libs\IGF_libs')
 from IGF_log import getlog
 from IGF_forms import ExcelSuche
-from IGF_libKopie import AllProjectParams_2020,AllSharedParams_2020,CreateSharedParam_2020,CreateProjFromSharedParam_2020,AllParameterType_2020,AllCategories,AllParameterGroup_2020
-from IGF_libKopie import AllProjectParams_2022,AllSharedParams_2022,CreateSharedParam_2022,CreateProjFromSharedParam_2022,AllParameterType_2022,AllParameterGroup_2022
+from IGF_lib import AllProjectParams_2020,AllSharedParams_2020,CreateSharedParam_2020,CreateProjFromSharedParam_2020,AllParameterType_2020,AllCategories,AllParameterGroup_2020,\
+                    AllProjectParams_2022,AllSharedParams_2022,CreateSharedParam_2022,CreateProjFromSharedParam_2022,AllParameterType_2022,AllParameterGroup_2022
 from pyrevit import script, forms
 from rpw import revit,DB
 import os
-
-import clr
-clr.AddReference("Microsoft.Office.Interop.Excel")
-import Microsoft.Office.Interop.Excel as ex
-from System.Runtime.InteropServices import Marshal
 
 
 __title__ = "0.01 Import Parameter von Excel" 
@@ -21,8 +14,10 @@ __doc__ = """erstellt Shared- und ProjektParameter von excel.
 +: erstellen
 -: löschen
 
-[2021.10.08]
-Version: 2.0"""
+update: Performance verbessert
+
+[2022.10.17]
+Version: 2.2"""
 __author__ = "Menghui Zhang"
 
 try:
@@ -65,163 +60,104 @@ except:
 # Excel lesen
 # Parameter Klass aus Excel
 class E_Parameter:
-    def __init__(self):
-        self.Name = ''
-        self.GUID = ''
-        self.Disziplin = ''
-        self.ParamType = ''
-        self.ParamGroup = ''
-        self.Kategorien = ''
-        self.Exemplar = ''
-        self.Group = ''
-        self.info = ''
-    @property
-    def Name(self):
-        return self._Name
-    @Name.setter
-    def Name(self,value):
-        self._Name = value
-    
-    @property
-    def GUID(self):
-        return self._GUID
-    @GUID.setter
-    def GUID(self,value):
-        self._GUID = value
-    
-    @property
-    def Disziplin(self):
-        return self._Disziplin
-    @Disziplin.setter
-    def Disziplin(self,value):
-        self._Disziplin = value
-    
-    @property
-    def ParamType(self):
-        return self._ParamType
-    @ParamType.setter
-    def ParamType(self,value):
-        self._ParamType = value
-    
-    @property
-    def ParamGroup(self):
-        return self._ParamGroup
-    @ParamGroup.setter
-    def ParamGroup(self,value):
-        self._ParamGroup = value
-    
-    @property
-    def Kategorien(self):
-        return self._Kategorien
-    @Kategorien.setter
-    def Kategorien(self,value):
-        self._Kategorien = value
-    
-    @property
-    def Exemplar(self):
-        return self._Exemplar
-    @Exemplar.setter
-    def Exemplar(self,value):
-        self._Exemplar = value
-    
-    @property
-    def Group(self):
-        return self._Group
-    @Group.setter
-    def Group(self,value):
-        self._Group = value
-    
-    @property
-    def info(self):
-        return self._info
-    @info.setter
-    def info(self,value):
-        self._info = value
+    def __init__(self,name = '',Disziplin = '', paramtype = '',paramgroup = '',kate = '',exemplar = False,Group = '',info = '',GUID = ''):
+        self.Name = name
+        self.GUID = GUID
+        self.Disziplin = Disziplin        
+        self.ParamType = paramtype
+        self.ParamGroup = paramgroup
+        self.Kategorien = kate
+        self.Exemplar = exemplar
+        self.Group = Group
+        self.info = info
+        self.row = None
 
 excelPath = config.adresse
-exapplication = ex.ApplicationClass()
+if revitversion == '2020':
+    import excel._NPOI_2020 as _NPOI
 
-book1 = exapplication.Workbooks.Open(excelPath)
-E_Parameter_Dict = {}
-E_Parameter_Dict_del = {}
+else:
+    import excel._NPOI_2022 as _NPOI
+# excelPath = r'C:\Users\Zhang\Desktop\IGF_Parameter_RUB-NA_2020.xlsx'
+fs = _NPOI.FileStream(excelPath,_NPOI.FileMode.Open,_NPOI.FileAccess.Read)
+book1 = _NPOI.np.XSSF.UserModel.XSSFWorkbook(fs)
+
+def get_cell_Daten(sheet,r,c):
+    row = sheet.GetRow(r)
+    if row:
+        cell = row.GetCell(c)
+        if cell:
+            return cell.StringCellValue
+        else:
+            return ''
+    else:
+        return ''
+
+def get_cell(row,column):
+    cell = row.GetCell(column)
+    if cell:return cell
+    else:
+        cell = row.CreateCell(column)
+        return cell
+
+Excel_Param_PLUS = []
+Excel_Param_MINUS = []
 GroupList = []
 
-sheetscount = book1.Worksheets.Count
-n = 0
-for sheet in book1.Worksheets:
-    n += 1
-    Group = sheet.Name
-    if Group in ['Hinweis','Keine Gruppe','Revit (Original)']:
+sheetscount = book1.NumberOfSheets
+for n in range(sheetscount):
+    sheet = book1.GetSheetAt(n)
+    SheetName = sheet.SheetName
+    if SheetName in ['Hinweis','Keine Gruppe','Revit (Original)']:
         continue
-    with forms.ProgressBar(title="Excel lesen",cancellable=True, step=1) as pb:
-        pb.title = str(n) + '/' + str(sheetscount) + " Excel lesen -- " + Group + " -- {value}/{max_value} Parameter"
-        rows = sheet.UsedRange.Rows.Count
-        for row in range(2, rows + 1):
-            if pb.cancelled:
-                Marshal.FinalReleaseComObject(sheet)
-                Marshal.FinalReleaseComObject(book1)
-                exapplication.Quit()
-                Marshal.FinalReleaseComObject(exapplication)
-                script.exit()
-            pb.update_progress(row-1, rows)
-            if sheet.Cells[row, 1].Value2 == '+':
-                param = E_Parameter()
-                param.Name = sheet.Cells[row, 3].Value2
-                param.GUID = sheet.Cells[row, 4].Value2
-                param.Disziplin = sheet.Cells[row, 5].Value2
-                param.ParamType = sheet.Cells[row, 6].Value2
-                param.ParamGroup = sheet.Cells[row, 7].Value2
-                param.Kategorien = sheet.Cells[row, 8].Value2
-                param.Exemplar = sheet.Cells[row, 9].Value2
-                param.Group = sheet.Cells[row, 12].Value2
-                param.info = sheet.Cells[row, 13].Value2
-                E_Parameter_Dict[param] = [Group,row]
-                if sheet.Cells[row, 12].Value2:
-                    if not sheet.Cells[row, 12].Value2 in GroupList:
-                        GroupList.append(sheet.Cells[row, 12].Value2)
-            elif sheet.Cells[row, 1].Value2 == '-':
-                param = E_Parameter()
-                param.Name = sheet.Cells[row, 3].Value2
-                param.GUID = sheet.Cells[row, 4].Value2
-                param.Disziplin = sheet.Cells[row, 5].Value2
-                param.ParamType = sheet.Cells[row, 6].Value2
-                param.ParamGroup = sheet.Cells[row, 7].Value2
-                param.Kategorien = sheet.Cells[row, 8].Value2
-                param.Exemplar = sheet.Cells[row, 9].Value2
-                param.Group = sheet.Cells[row, 12].Value2
-                param.info = sheet.Cells[row, 13].Value2
-                E_Parameter_Dict_del[param] = [Group,row]
 
+    rows = sheet.LastRowNum
+    for row in range(1,rows+1):
+        row_daten = sheet.GetRow(row)
+        if row_daten:
+            if get_cell_Daten(sheet,row,0) == '+':
+                param = E_Parameter(
+                    name=get_cell_Daten(sheet,row,2),\
+                    GUID=get_cell_Daten(sheet,row,3),\
+                    Disziplin=get_cell_Daten(sheet,row,4),\
+                    paramtype=get_cell_Daten(sheet,row,5),\
+                    paramgroup=get_cell_Daten(sheet,row,6),\
+                    kate=get_cell_Daten(sheet,row,7),\
+                    exemplar=get_cell_Daten(sheet,row,8),\
+                    Group=get_cell_Daten(sheet,row,11),\
+                    info=get_cell_Daten(sheet,row,12))
+                param.row = row_daten
+                Excel_Param_PLUS.append(param)
+                if param.Group not in GroupList:
+                    GroupList.append(param.Group)
+                
 
-book1.Save()
-book1.Close()
-
+            elif get_cell_Daten(sheet,row,0) == '-':
+                param = E_Parameter(
+                    name=get_cell_Daten(sheet,row,2),\
+                    GUID=get_cell_Daten(sheet,row,3),\
+                    Disziplin=get_cell_Daten(sheet,row,4),\
+                    paramtype=get_cell_Daten(sheet,row,5),\
+                    paramgroup=get_cell_Daten(sheet,row,6),\
+                    kate=get_cell_Daten(sheet,row,7),\
+                    exemplar=get_cell_Daten(sheet,row,8),\
+                    Group=get_cell_Daten(sheet,row,11),\
+                    info=get_cell_Daten(sheet,row,12))
+                param.row = row_daten
+                Excel_Param_MINUS.append(param)
 
 filename = app.SharedParametersFilename
 file = app.OpenSharedParameterFile()
 
+# Group erstellen
 Groups = [i.Name for i in file.Groups]
 for i in GroupList:
     if not i in Groups:
         file.Groups.Create(i)
 
-E_Parameter_Liste = []
-E_Parameter_Liste_del = []
-
-try:
-    E_Parameter_Liste = E_Parameter_Dict.keys()[:]
-except Exception as e:
-    logger.error(e)
-
-try:
-    E_Parameter_Liste_del = E_Parameter_Dict_del.keys()[:]
-except Exception as e:
-    logger.error(e)
-
-book2 = exapplication.Workbooks.Open(excelPath)   
 t = DB.Transaction(doc)
 # SharedParameter, ProjektParameter
-if E_Parameter_Liste:
+if Excel_Param_PLUS:
     t.Start('Parameter erstellen')
     if revitversion == '2020':
         sharedparams,sharedparam_defis = AllSharedParams_2020()
@@ -232,28 +168,30 @@ if E_Parameter_Liste:
         dmap = doc.ParameterBindings
 
         with forms.ProgressBar(title="{value}/{max_value} Parameter erstellt",cancellable=True, step=1) as pb1:
-            for n1,e_param in enumerate(E_Parameter_Liste):
+            for n,e_param in enumerate(Excel_Param_PLUS):
                 if pb1.cancelled:
                     t.RollBack()
-                    book2.Close(SaveChanges = False)
                     break
-                pb1.update_progress(n1+1,len(E_Parameter_Liste))
+                pb1.update_progress(n+1,len(Excel_Param_PLUS))
 
                 if e_param.GUID in projectparams.keys():
                     if e_param.Disziplin == projectparams[e_param.GUID][1] and e_param.ParamType == projectparams[e_param.GUID][2]:
                         logger.info("ProjektParameter {} vorhanden".format(e_param.Name))
                         try:
-                            book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],1] = ''
-                            book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],2] = 'Projektparameter'
+                            cell_0 = get_cell(e_param.row,0)
+                            cell_1 = get_cell(e_param.row,1)
+                            cell_0.SetCellValue('')
+                            cell_1.SetCellValue('Projektparameter')
                         except:
                             pass
   
                     else:
                         logger.error('Parameter {} konnte nicht erstellt werden wegen GUID-Konflikt'.format(e_param.Name))
                         continue
-                    kate_excel_temp = e_param.Kategorien.Split(',')
+
+                    kate_excel_temp = e_param.Kategorien.split(',')
                     kate_excel = []
-                    kate_revit = projectparams[e_param.GUID][5].Split(',')
+                    kate_revit = projectparams[e_param.GUID][5].split(',')
                     for i in kate_excel_temp:
                         if i:
                             while(i[0] == ' '):
@@ -271,16 +209,26 @@ if E_Parameter_Liste:
                             for i in kate_excel:
                                 if i in Categories_dict.keys():
                                     ParaCatSet.Insert(Categories_dict[i])
+                                else:
+                                    logger.error("{} ist keine Revit-Kategorie, bitte überprüfen.".format(i))
+                            if ParaCatSet.IsEmpty:
+                                continue
                             binding = app.Create.NewTypeBinding(ParaCatSet)
                             if projectparams[e_param.GUID][4] == 'Exemplar':
                                 binding = app.Create.NewInstanceBinding(ParaCatSet)
-                            dmap.ReInsert(projeparam_defis[e_param.GUID], binding, ParamGroup_dict[e_param.ParamGroup])
-                            logger.info('Parameter {} wird aktualisiert'.format(e_param.Name))
-                            try:
-                                book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],1] = ''
-                                book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],2] = 'Projektparameter'
-                            except:
-                                pass
+                            if e_param.ParamGroup in ParamGroup_dict.keys():
+                                dmap.ReInsert(projeparam_defis[e_param.GUID], binding, ParamGroup_dict[e_param.ParamGroup])
+                                logger.info('Parameter {} wird aktualisiert'.format(e_param.Name))
+                                try:
+                                    cell_0 = get_cell(e_param.row,0)
+                                    cell_1 = get_cell(e_param.row,1)
+                                    cell_0.SetCellValue('')
+                                    cell_1.SetCellValue('Projektparameter')
+
+                                except:
+                                    pass
+                            else:
+                                logger.error("{} ist kein Revit-Parametergroup, bitte überprüfen.".format(e_param.ParamGroup))
                             continue
                 try:
                     paramtype = ParamType_dict[e_param.Disziplin][e_param.ParamType]
@@ -300,26 +248,34 @@ if E_Parameter_Liste:
                             
                     logger.info('Shared Parameter {} vorhanden'.format(e_param.Name))
                     try:
-                        book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],1] = ''
-                        book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],2] = 'Sharedparameter'
-                        book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],4] = exdefinition.GUID.ToString()
+                        cell_0 = get_cell(e_param.row,0)
+                        cell_1 = get_cell(e_param.row,1)
+                        cell_3 = get_cell(e_param.row,3)
+                        cell_0.SetCellValue('')
+                        cell_1.SetCellValue('Sharedparameter')
+                        cell_3.SetCellValue(exdefinition.GUID.ToString())
                     except:
                         pass
                 else:
                     exdefinition = CreateSharedParam_2020(Name=e_param.Name, Disziplin=e_param.Disziplin,Typ=e_param.ParamType,GUID=e_param.GUID,Info=e_param.info,Gruppe=e_param.Group)
                     logger.info('Shared Parameter {} erstellt'.format(e_param.Name))
                     try:
-                        book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],1] = ''
-                        book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],2] = 'Sharedparameter'
-                        book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],4] = exdefinition.GUID.ToString()
+                        cell_0 = get_cell(e_param.row,0)
+                        cell_1 = get_cell(e_param.row,1)
+                        cell_3 = get_cell(e_param.row,3)
+                        cell_0.SetCellValue('')
+                        cell_1.SetCellValue('Sharedparameter')
+                        cell_3.SetCellValue(exdefinition.GUID.ToString())
                     except:
                         pass           
                 try:
                     if e_param.Exemplar and e_param.Kategorien:
                         CreateProjFromSharedParam_2020(ExternalDefinition=exdefinition,Gruppe=e_param.ParamGroup,Kategorien=e_param.Kategorien,Typ_Exemplar=e_param.Exemplar)
                         try:
-                            book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],1] = ''
-                            book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],2] = 'Projektparameter'
+                            cell_0 = get_cell(e_param.row,0)
+                            cell_1 = get_cell(e_param.row,1)
+                            cell_0.SetCellValue('')
+                            cell_1.SetCellValue('Projektparameter')
                         except:
                             pass 
                         logger.info("ProjektParameter {} wird erstellt".format(e_param.Name))
@@ -330,7 +286,7 @@ if E_Parameter_Liste:
                     logger.error("ProjektParameter {} konnte nicht erstellt werden".format(e_param.Name))
 
         
-    elif revitversion == '2022':
+    else:
         sharedparams,sharedparam_defis = AllSharedParams_2022()
         projectparams,projeparam_defis = AllProjectParams_2022()
         ParamGroup_dict = AllParameterGroup_2022()
@@ -340,29 +296,30 @@ if E_Parameter_Liste:
 
         with forms.ProgressBar(title="{value}/{max_value} Parameter erstellt",cancellable=True, step=1) as pb1:
 
-            for n1,e_param in enumerate(E_Parameter_Liste):
+            for n,e_param in enumerate(Excel_Param_PLUS):
                 if pb1.cancelled:
                     t.RollBack()
-                    book2.Close(SaveChanges = False)
                     break
-                pb1.update_progress(n1+1,len(E_Parameter_Liste))
+                pb1.update_progress(n+1,len(Excel_Param_PLUS))
 
 
                 if e_param.GUID in projectparams.keys():
                     if e_param.Disziplin == projectparams[e_param.GUID][1] and e_param.ParamType == projectparams[e_param.GUID][2]:
                         logger.info("ProjektParameter {} vorhanden".format(e_param.Name))
                         try:
-                            book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],1] = ''
-                            book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],2] = 'Projektparameter'
+                            cell_0 = get_cell(e_param.row,0)
+                            cell_1 = get_cell(e_param.row,1)
+                            cell_0.SetCellValue('')
+                            cell_1.SetCellValue('Projektparameter')
                         except:
                             pass
                         
                     else:
                         logger.error('Parameter {} konnte nicht erstellt werden wegen GUID-Konflikt'.format(e_param.Name))
                         continue
-                    kate_excel_temp = e_param.Kategorien.Split(',')
+                    kate_excel_temp = e_param.Kategorien.split(',')
                     kate_excel = []
-                    kate_revit = projectparams[e_param.GUID][5].Split(',')
+                    kate_revit = projectparams[e_param.GUID][5].split(',')
                     for i in kate_excel_temp:
                         if i:
                             while(i[0] == ' '):
@@ -380,17 +337,28 @@ if E_Parameter_Liste:
                             for i in kate_excel:
                                 if i in Categories_dict.keys():
                                     ParaCatSet.Insert(Categories_dict[i])
+                                else:
+                                    logger.error("{} ist keine Revit-Kategorie, bitte überprüfen.".format(i))
+                            if ParaCatSet.IsEmpty:
+                                continue
                             binding = app.Create.NewTypeBinding(ParaCatSet)
                             if projectparams[e_param.GUID][4] == 'Exemplar':
                                 binding = app.Create.NewInstanceBinding(ParaCatSet)
-                            dmap.ReInsert(projeparam_defis[e_param.GUID], binding, ParamGroup_dict[e_param.ParamGroup])
-                            logger.info('Parameter {} wird aktualisiert'.format(e_param.Name))
-                            try:
-                                book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],1] = ''
-                                book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],2] = 'Projektparameter'
-                            except:
-                                pass
+                            if e_param.ParamGroup in ParamGroup_dict.keys():
+                                dmap.ReInsert(projeparam_defis[e_param.GUID], binding, ParamGroup_dict[e_param.ParamGroup])
+                                logger.info('Parameter {} wird aktualisiert'.format(e_param.Name))
+                                try:
+                                    cell_0 = get_cell(e_param.row,0)
+                                    cell_1 = get_cell(e_param.row,1)
+                                    cell_0.SetCellValue('')
+                                    cell_1.SetCellValue('Projektparameter')
+
+                                except:
+                                    pass
+                            else:
+                                logger.error("{} ist kein Revit-Parametergroup, bitte überprüfen.".format(e_param.ParamGroup))
                             continue
+
                 try:
                     paramtype = AllParameterType_2022()[e_param.Disziplin][e_param.ParamType]
                 except:
@@ -402,16 +370,18 @@ if E_Parameter_Liste:
                         if e_param.GUID != exdefinition.GUID.ToString():
                             logger.error('Parameter {} konnte nicht erstellt werden wegen Namen-Konflikt'.format(e_param.Name))
                             continue
-                    
-                    if paramtype.TypeId.ToString() != exdefinition.GetDataType().TypeId.ToString():
+                    if paramtype.TypeId != exdefinition.GetDataType().TypeId:
                         logger.error('Parameter {} bereits vorhanden, aber der Parametertyp vorhandenes Parameter passt nicht zum Parametertyp von Excel'.format(e_param.Name))
                         continue
                             
                     logger.info('Shared Parameter {} vorhanden'.format(e_param.Name))
                     try:
-                        book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],1] = ''
-                        book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],2] = 'Sharedparameter'
-                        book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],4] = exdefinition.GUID.ToString()
+                        cell_0 = get_cell(e_param.row,0)
+                        cell_1 = get_cell(e_param.row,1)
+                        cell_3 = get_cell(e_param.row,3)
+                        cell_0.SetCellValue('')
+                        cell_1.SetCellValue('Sharedparameter')
+                        cell_3.SetCellValue(exdefinition.GUID.ToString())
                     except:
                         pass
                 else:
@@ -419,9 +389,12 @@ if E_Parameter_Liste:
                     logger.info('Shared Parameter {} erstellt'.format(e_param.Name))
                     doc.Regenerate()
                     try:
-                        book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],1] = ''
-                        book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],2] = 'Sharedparameter'
-                        book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],4] = exdefinition.GUID.ToString()
+                        cell_0 = get_cell(e_param.row,0)
+                        cell_1 = get_cell(e_param.row,1)
+                        cell_3 = get_cell(e_param.row,3)
+                        cell_0.SetCellValue('')
+                        cell_1.SetCellValue('Sharedparameter')
+                        cell_3.SetCellValue(exdefinition.GUID.ToString())
                     except:
                         pass          
                 try:
@@ -430,8 +403,10 @@ if E_Parameter_Liste:
                         
                         logger.info("ProjektParameter {} wird erstellt".format(e_param.Name))
                         try:
-                            book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],1] = ''
-                            book2.Worksheets[E_Parameter_Dict[e_param][0]].Cells[E_Parameter_Dict[e_param][1],2] = 'Projektparameter'
+                            cell_0 = get_cell(e_param.row,0)
+                            cell_1 = get_cell(e_param.row,1)
+                            cell_0.SetCellValue('')
+                            cell_1.SetCellValue('Projektparameter')
                         except:
                             pass
                     else:
@@ -444,12 +419,8 @@ if E_Parameter_Liste:
 if t.HasStarted():
     doc.Regenerate()
     t.Commit()
-book2.Save()
-book2.Close()
 
-
-book3 = exapplication.Workbooks.Open(excelPath)   
-if E_Parameter_Liste_del:  
+if Excel_Param_MINUS:  
     t.Start('Parameter löschen')   
     with forms.ProgressBar(title="{value}/{max_value} Parameter löschen",cancellable=True, step=1) as pb1:
         _params = DB.FilteredElementCollector(doc).OfClass(DB.ParameterElement).WhereElementIsNotElementType()
@@ -459,31 +430,36 @@ if E_Parameter_Liste_del:
         for el in _paramids:
             _ParamDict[doc.GetElement(el).GetDefinition().Name] = el
 
-        for n1,e_param in enumerate(E_Parameter_Liste_del):
+        for n1,e_param in enumerate(Excel_Param_MINUS):
             if pb1.cancelled:
                 t.RollBack()
-                book3.Close(SaveChanges = False)
                 script.exit()
-            pb1.update_progress(n1+1,len(E_Parameter_Liste_del))
+            pb1.update_progress(n1+1,len(Excel_Param_MINUS))
             if e_param.Name in _ParamDict.keys():
                 if forms.alert("Parameter {} löschen?".format(e_param.Name), ok=False, yes=True, no=True):
                     doc.Delete(_ParamDict[e_param.Name])
                     logger.info("ProjektParameter {} wird gelöscht".format(e_param.Name))
                     try:
-                        book3.Worksheets[E_Parameter_Dict_del[e_param][0]].Cells[E_Parameter_Dict_del[e_param][1],1] = ''
-                        book3.Worksheets[E_Parameter_Dict_del[e_param][0]].Cells[E_Parameter_Dict_del[e_param][1],2] = 'Sharedparameter'
+                        cell_0 = get_cell(e_param.row,0)
+                        cell_1 = get_cell(e_param.row,1)
+                        cell_0.SetCellValue('')
+                        cell_1.SetCellValue('Sharedparameter')
                     except:
                         pass
             else:
                 logger.info("ProjektParameter {} nicht vorhanden".format(e_param.Name))
                 try:
-                    book3.Worksheets[E_Parameter_Dict_del[e_param][0]].Cells[E_Parameter_Dict_del[e_param][1],1] = ''
-                    book3.Worksheets[E_Parameter_Dict_del[e_param][0]].Cells[E_Parameter_Dict_del[e_param][1],2] = 'Sharedparameter'
+                    cell_0 = get_cell(e_param.row,0)
+                    cell_1 = get_cell(e_param.row,1)
+                    cell_0.SetCellValue('')
+                    cell_1.SetCellValue('Sharedparameter')
                 except:
                     pass
 
 if t.HasStarted():
     t.Commit()
 
-book3.Save()
-book3.Close()
+fs = _NPOI.FileStream(excelPath, _NPOI.FileMode.Create, _NPOI.FileAccess.Write)
+book1.Write(fs)
+book1.Close()
+fs.Close()

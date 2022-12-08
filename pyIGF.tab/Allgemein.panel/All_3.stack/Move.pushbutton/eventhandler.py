@@ -5,12 +5,19 @@ import Autodesk.Revit.DB as DB
 
 class LINKS(IExternalEventHandler):
     def __init__(self):
+        self.GUI = None
         self.zahl = 0
         
     def Execute(self,app):
         uidoc = app.ActiveUIDocument
         doc = uidoc.Document
         cl = uidoc.Selection.GetElementIds()
+        try:
+            self.zahl = 0 - float(self.GUI.zahl.Text)
+        except:
+            TaskDialog.Show('Fehler','Zahl passt nicht!')
+            return
+
         xyz = DB.XYZ(self.zahl/304.8,0,0)
 
         t = DB.Transaction(doc,'move')
@@ -22,22 +29,76 @@ class LINKS(IExternalEventHandler):
     def GetName(self):
         return "Links"
 
-class RECHTS(IExternalEventHandler):
+class UNTEN(IExternalEventHandler):
     def __init__(self):
         self.zahl = 0
+        self.GUI = None
         
     def Execute(self,app):
         uidoc = app.ActiveUIDocument
         doc = uidoc.Document
         cl = uidoc.Selection.GetElementIds()
+        try:
+            self.zahl = 0 - float(self.GUI.zahl.Text)
+        except:
+            TaskDialog.Show('Fehler','Zahl passt nicht!')
+            return
+        xyz = DB.XYZ(0,0,self.zahl/304.8)
+
+        t = DB.Transaction(doc,'move')
+        t.Start()
+
+        DB.ElementTransformUtils.MoveElements(doc,cl,xyz)
+        t.Commit()
+
+    def GetName(self):
+        return "Unten"
+
+class HINTER(IExternalEventHandler):
+    def __init__(self):
+        self.zahl = 0
+        self.GUI = None
+        
+    def Execute(self,app):
+        uidoc = app.ActiveUIDocument
+        doc = uidoc.Document
+        cl = uidoc.Selection.GetElementIds()
+        try:
+            self.zahl = float(self.GUI.zahl.Text)
+        except:
+            TaskDialog.Show('Fehler','Zahl passt nicht!')
+            return
+        xyz = DB.XYZ(0,self.zahl/304.8,0)
+
+        t = DB.Transaction(doc,'move')
+        t.Start()
+
+        DB.ElementTransformUtils.MoveElements(doc,cl,xyz)
+        t.Commit()
+
+    def GetName(self):
+        return "Hinter"
+
+class RECHTS(IExternalEventHandler):
+    def __init__(self):
+        self.zahl = 0
+        self.GUI = None
+        
+    def Execute(self,app):
+        uidoc = app.ActiveUIDocument
+        doc = uidoc.Document
+        cl = uidoc.Selection.GetElementIds()
+        try:
+            self.zahl = float(self.GUI.zahl.Text)
+        except:
+            TaskDialog.Show('Fehler','Zahl passt nicht!')
+            return
         xyz = DB.XYZ(self.zahl/304.8,0,0)
 
         t = DB.Transaction(doc,'move')
         t.Start()
-        DB.ElementTransformUtils.MoveElements(doc,cl,xyz)
 
-        for el in cl:
-            el.Location.Move(xyz)
+        DB.ElementTransformUtils.MoveElements(doc,cl,xyz)
         t.Commit()
 
     def GetName(self):
@@ -46,12 +107,18 @@ class RECHTS(IExternalEventHandler):
 class OBEN(IExternalEventHandler):
     def __init__(self):
         self.zahl = 0
+        self.GUI = None
         
     def Execute(self,app):
         uidoc = app.ActiveUIDocument
         doc = uidoc.Document
         cl = uidoc.Selection.GetElementIds()
-        xyz = DB.XYZ(0,self.zahl/304.8,0)
+        try:
+            self.zahl = float(self.GUI.zahl.Text)
+        except:
+            TaskDialog.Show('Fehler','Zahl passt nicht!')
+            return
+        xyz = DB.XYZ(0,0,self.zahl/304.8)
 
         t = DB.Transaction(doc,'move')
         t.Start()
@@ -62,15 +129,20 @@ class OBEN(IExternalEventHandler):
     def GetName(self):
         return "Oben"
 
-class UNTEN(IExternalEventHandler):
+class VORNE(IExternalEventHandler):
     def __init__(self):
-        self.elems = None
+        self.GUI = None
         self.zahl = 0
         
     def Execute(self,app):
         uidoc = app.ActiveUIDocument
         doc = uidoc.Document
         cl = uidoc.Selection.GetElementIds()
+        try:
+            self.zahl = 0 - float(self.GUI.zahl.Text)
+        except:
+            TaskDialog.Show('Fehler','Zahl passt nicht!')
+            return
         xyz = DB.XYZ(0,self.zahl/304.8,0)
 
         t = DB.Transaction(doc,'move')
@@ -80,4 +152,4 @@ class UNTEN(IExternalEventHandler):
         t.Commit()
 
     def GetName(self):
-        return "Unten"
+        return "Vorne"

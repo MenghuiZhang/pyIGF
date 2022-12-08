@@ -4,7 +4,7 @@ from eventhandler import revit,forms,ADDISO,REMOVEISO,EINGABE,ExternalEvent,IS_I
 import os
 from System.Windows import GridLength
 
-__title__ = "Röhrdämmung"
+__title__ = "Rohrdämmung"
 __doc__ = """
 Parameter:
 IGF_X_Vorgabe_ISO_Dicke: Vorgabe_ISO_Dicke
@@ -106,6 +106,7 @@ class AktuelleBerechnung(forms.WPFWindow):
         self.addISO.system = self.system_sel.IsChecked
         self.addISO.vorhandenbearbeiten = self.anpassen.IsChecked
         self.addISO.rohr = self.pipe.IsChecked
+        self.addISO.rohraccessory = self.pipeaccessory.IsChecked
         self.addISO.rohrformteil = self.pipefitting.IsChecked
         self.addISO.flexrohr = self.softpipe.IsChecked
         self.addISO.typ = [el for el in self.Liste_Systemtyp if el.checked]
@@ -124,6 +125,7 @@ class AktuelleBerechnung(forms.WPFWindow):
         self.removeISO.elem = self.system_elems.IsChecked
         self.removeISO.system = self.system_sel.IsChecked
         self.removeISO.rohr = self.pipe.IsChecked
+        self.removeISO.rohraccessory = self.pipeaccessory.IsChecked
         self.removeISO.rohrformteil = self.pipefitting.IsChecked
         self.removeISO.flexrohr = self.softpipe.IsChecked
         self.removeISO.typ = [el for el in self.Liste_Systemtyp if el.checked]

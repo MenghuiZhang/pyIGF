@@ -36,9 +36,6 @@ except:
     config = config_user
 
 
-from pyIGF_logInfo import getlog
-getlog(__title__)
-
 plan_coll = DB.FilteredElementCollector(doc) \
     .OfCategory(DB.BuiltInCategory.OST_Sheets) \
     .WhereElementIsNotElementType()
@@ -331,7 +328,7 @@ for ele in Liste_Plan:
         Liste_Plaene_checked.append(ele)
 
 if len(Liste_Plaene_checked) == 0:
-    UI.TaskDialog.Show('','Kein Plan ausgewählt!')
+    UI.TaskDialog.Show('Info','Kein Plan ausgewählt!')
     script.exit()
 
 t = DB.Transaction(doc, 'Raster anpassen')
@@ -345,15 +342,16 @@ with forms.ProgressBar(title='{value}/{max_value} Pläne ausgewählt',cancellabl
         pb.update_progress(n+1, len(Liste_Plaene_checked))
         plan = doc.GetElement(elem.planid)
         plankopf = elem.plankopf
-        Viewport_dict = {'Grundrisse':[],'Legenden':[]}
+        Viewport_dict = {'Grundrisse':[],'Legenden':[],'Schnitte':[]}
         Viewports = plan.GetAllViewports()
         for elem_id in Viewports:
             elem_viewport = doc.GetElement(elem_id)
             typ = elem_viewport.get_Parameter(DB.BuiltInParameter.VIEW_FAMILY).AsString()
-            if typ in ['Grundrisse','Legenden']:
+            if typ in ['Grundrisse','Legenden','Schnitte']:
                 Viewport_dict[typ].append(elem_viewport)
         grundrisse = Viewport_dict['Grundrisse']
         legenden = Viewport_dict['Legenden']
+        schnitte = Viewport_dict['Schnitte']
         for grundriss in grundrisse:
             grundriss.Pinned = False
             if config_temp.HA_Ansicht_anpassen:
@@ -400,11 +398,20 @@ with forms.ProgressBar(title='{value}/{max_value} Pläne ausgewählt',cancellabl
                             newEnd = None
                             newLine = None
                             if abs(X1-X2) > 1:
-                                newStart = DB.XYZ(max_X,Y1,Z1)
-                                newEnd = DB.XYZ(min_X,Y2,Z2)
-                            if abs(Y1-Y2) > 1:
-                                newStart = DB.XYZ(X1,max_Y,Z1)
-                                newEnd = DB.XYZ(X2,min_Y,Z2)
+                                if X1>X2:
+                                    newStart = DB.XYZ(max_X,Y1,Z1)
+                                    newEnd = DB.XYZ(min_X,Y2,Z2)
+                                else:
+                                    newStart = DB.XYZ(min_X,Y1,Z1)
+                                    newEnd = DB.XYZ(max_X,Y2,Z2)
+                            elif abs(Y1-Y2) > 1:
+                                if Y1>Y2:
+                                    newStart = DB.XYZ(X1,max_Y,Z1)
+                                    newEnd = DB.XYZ(X2,min_Y,Z2)
+                                else:
+                                    newStart = DB.XYZ(X1,min_Y,Z1)
+                                    newEnd = DB.XYZ(X2,max_Y,Z2)
+
                             if all([newStart,newEnd]):
                                 newLine = DB.Line.CreateBound( newStart, newEnd )
                             if newLine:
@@ -426,6 +433,105 @@ with forms.ProgressBar(title='{value}/{max_value} Pläne ausgewählt',cancellabl
                     logger.error('mehr als 1 Grundrisse in Plan {}, Verschieben von Grundrisse unmöglich.'.format(elem.plannummer))
 
             grundriss.Pinned = True
+
+        for schnitt in schnitte:
+            schnitt.Pinned = False
+            if config_temp.HA_Ansicht_anpassen:
+                try:
+                   schnitt.ChangeTypeId(viewport_dict[config_temp.HA_Ansicht_anpassen])
+                except:
+                    logger.error('Fehler beim Ändern des Ansichtsfenstertypes der Hauptansciht von Plan {}.'.format(elem.plannummer))
+            try:
+                viewID = doc.GetElement(schnitt.ViewId)
+                cropbox = viewID.GetCropRegionShapeManager()
+                cropbox.TopAnnotationCropOffset = float(config_temp.bz_o_anpassen) / 304.8
+                cropbox.BottomAnnotationCropOffset = float(config_temp.bz_u_anpassen) / 304.8
+                cropbox.RightAnnotationCropOffset = float(config_temp.bz_r_anpassen) / 304.8
+                cropbox.LeftAnnotationCropOffset = float(config_temp.bz_l_anpassen) / 304.8
+            except:
+                logger.error('Fehler beim Ändern des Versatz von Beschriftungszuschnitt von Plan {}.'.format(elem.plannummer))
+            doc.Regenerate()
+            if config_temp.raster_anpassen:
+                try:
+                    rasters_collector = DB.FilteredElementCollector(doc,viewID.Id).OfCategory(DB.BuiltInCategory.OST_Grids).WhereElementIsNotElementType()
+                    rasters = rasters_collector.ToElementIds()
+                    rasters_collector.Dispose()
+                    view = viewID.GetDependentElements(DB.ElementCategoryFilter(DB.BuiltInCategory.OST_Viewers))
+                    box = doc.GetElement(view[0]).get_BoundingBox(viewID)
+                    max_X = box.Max.X
+                    max_Y = box.Max.Y
+                    min_X = box.Min.X
+                    min_Y = box.Min.Y
+                    max_Z = box.Max.Z
+                    min_Z = box.Min.Z
+                    for rasid in rasters:
+                        raster = doc.GetElement(rasid)
+                        raster.Pinned = False
+                        gridCurves = raster.GetCurvesInView(DB.DatumExtentType.ViewSpecific, viewID)
+                        visible0 = raster.IsBubbleVisibleInView(DB.DatumEnds.End0,viewID)
+                        visible1 = raster.IsBubbleVisibleInView(DB.DatumEnds.End1,viewID)
+                        if not gridCurves:
+                            continue
+                        for gridCurve in gridCurves:
+                            start = gridCurve.GetEndPoint( 0 )
+                            end = gridCurve.GetEndPoint( 1 )
+                            
+                            X1 = start.X
+                            Y1 = start.Y
+                            Z1 = start.Z
+                            X2 = end.X
+                            Y2 = end.Y
+                            Z2 = end.Z
+                            newStart = None
+                            newEnd = None
+                            newLine = None
+                            if abs(X1-X2) > 1:
+                                if X1>X2:
+                                    newStart = DB.XYZ(max_X,Y1,Z1)
+                                    newEnd = DB.XYZ(min_X,Y2,Z2)
+                                else:
+                                    newStart = DB.XYZ(min_X,Y1,Z1)
+                                    newEnd = DB.XYZ(max_X,Y2,Z2)
+                            elif abs(Y1-Y2) > 1:
+                                if Y1>Y2:
+                                    newStart = DB.XYZ(X1,max_Y,Z1)
+                                    newEnd = DB.XYZ(X2,min_Y,Z2)
+                                else:
+                                    newStart = DB.XYZ(X1,min_Y,Z1)
+                                    newEnd = DB.XYZ(X2,max_Y,Z2)
+
+                            elif abs(Z1-Z2) > 1:
+                                if Z1 > Z2:
+                                    newStart = DB.XYZ(X1,Y1,max_Z)
+                                    newEnd = DB.XYZ(X2,Y2,min_Z)
+                                else:
+                                    newStart = DB.XYZ(X1,Y1,min_Z)
+                                    newEnd = DB.XYZ(X2,Y2,max_Z)
+                            if all([newStart,newEnd]):
+                                newLine = DB.Line.CreateBound( newStart, newEnd )
+                            if newLine:
+                                raster.SetCurveInView(DB.DatumExtentType.ViewSpecific, viewID, newLine )
+                        if visible0:raster.ShowBubbleInView(DB.DatumEnds.End0, viewID)
+                        else:raster.HideBubbleInView(DB.DatumEnds.End0, viewID)
+                        if visible1:raster.ShowBubbleInView(DB.DatumEnds.End1, viewID)
+                        else:raster.HideBubbleInView(DB.DatumEnds.End1, viewID)
+                        raster.Pinned = True
+                except:
+                    logger.error('Fehler beim Anpassen der Raster der Hauptansciht von Plan {}.'.format(elem.plannummer))
+            doc.Regenerate()
+            if config_temp.Haupt_anpassen:
+                if len(schnitte) < 2:
+                    try:
+                        x_move = plankopf.get_BoundingBox(plan).Min.X - schnitt.get_BoundingBox(plan).Min.X + float(config_temp.pk_l_anpassen) / 304.8 
+                        y_move = plankopf.get_BoundingBox(plan).Max.Y - schnitt.get_BoundingBox(plan).Max.Y - float(config_temp.pk_o_anpassen) / 304.8
+                        xyz_move = DB.XYZ(x_move,y_move,0)
+                        schnitt.Location.Move(xyz_move)
+                    except:
+                        logger.error('Fehler beim Verschieben der Hauptansicht von Plan {}.'.format(elem.plannummer))
+                else:
+                    logger.error('mehr als 1 Schnitte in Plan {}, Verschieben von Schnitt unmöglich.'.format(elem.plannummer))
+
+            schnitt.Pinned = True
 
         for legend in legenden:
             legend.Pinned = False

@@ -1,7 +1,7 @@
 <Window
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Kombirahmen ---> DistributionBox" Height="400" Width="420" Background="SkyBlue" ResizeMode="NoResize" WindowStartupLocation="CenterScreen">
+        Title="Kombirahmen ---> DistributionBox" Height="400" Width="600" Background="SkyBlue" ResizeMode="NoResize" WindowStartupLocation="CenterScreen">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="90"/>
@@ -24,16 +24,15 @@
                         <TextBlock Text="Modus" FontWeight="Bold" />
                     </GroupBox.Header>
                     <DockPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <RadioButton x:Name="modell" Content="Projekt" IsChecked="True" Margin="0,0,15,0" VerticalAlignment="Center" Click="changetomodell"/>
-                        <RadioButton x:Name="ansicht" Content="Ansicht" Margin="0,0,15,0" VerticalAlignment="Center" Click="changetoansicht" />
-                        <RadioButton x:Name="auswahl" Content="Auswahl" VerticalAlignment="Center" Margin="0,0,15,0" Click="changetoselect"/>
-                        <Button x:Name="aktu" Content="Auswahl aktualisieren" Click="update" Margin="10,0,0,0" IsEnabled="False"/>
+                        <RadioButton x:Name="modell" Content="Projekt" IsChecked="True" Margin="0,0,70,0" VerticalAlignment="Center"/>
+                        <RadioButton x:Name="ansicht" Content="Ansicht" Margin="0,0,70,0" VerticalAlignment="Center" />
+                        <RadioButton x:Name="auswahl" Content="Auswahl" VerticalAlignment="Center" Margin="0,0,70,0" />
                     </DockPanel>
                 </GroupBox>
                 <StackPanel Grid.Row="2" >
                     <DockPanel Margin="0,10,0,0">
                         <TextBlock Text="Kombirahmen:" Margin="10,0" VerticalAlignment="Center" FontWeight="Bold"/>
-                        <ComboBox x:Name="kombi" Height="25" Margin="10,0,30,0" SelectionChanged="sourcechanged">
+                        <ComboBox x:Name="kombi" Height="25" Margin="10,0,10,0">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding name}"/>
@@ -44,7 +43,7 @@
                     </DockPanel>
                     <DockPanel Margin="0,10,0,0">
                         <TextBlock Text="DistributionBox:" Margin="10,0" VerticalAlignment="Center" FontWeight="Bold"/>
-                        <ComboBox x:Name="distribution" Height="25" Margin="2,0,30,0" IsEnabled="False">
+                        <ComboBox x:Name="distribution" Height="25" Margin="2,0,10,0" IsEnabled="False">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding name}"/>
@@ -54,15 +53,20 @@
                     </DockPanel>
 
                 </StackPanel>
-                <Button Click="start" Content="austauschen" Height="20"  Margin="20,10,20,0" ToolTip="Kombirahmen -----> DistributionBox"/>
+                <Button x:Name="austausch" Click="start" Content="austauschen" Height="20"  Margin="20,10,20,0" ToolTip="Kombirahmen -----> DistributionBox"/>
             </StackPanel>
 
         </GroupBox>
+        <ProgressBar x:Name="progress_aus" Height="20"  Margin="0,150,0,5" Grid.Row="1"  Width="532" Visibility="Hidden"/>
+        <TextBlock x:Name="title_p_aus" Height="20"  Margin="0,150,0,5" Grid.Row="1" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center" Width="532" Visibility="Hidden"/>
         <GroupBox Grid.Row="2" Margin="5">
             <GroupBox.Header>
                 <TextBlock Text="DistributionBox" FontWeight="Bold" />
             </GroupBox.Header>
-            <Button Click="neunummerieren" Content="DistributionBox neu nummerieren" Height="20" Margin="20,3,20,0" ToolTip="DistributionBox mit gleiche Familie werden neu nummeriert."/>
+            <Button x:Name="neu_nummer" Click="neunummerieren" Content="DistributionBox neu nummerieren" Height="20" Margin="20,3,20,0" ToolTip="DistributionBox mit gleiche Familie werden neu nummeriert."/>
+
         </GroupBox>
+        <ProgressBar x:Name="progress_neu" Height="20"  Margin="0,19,0,5" Grid.Row="2" Visibility="Hidden"  Width="532"/>
+        <TextBlock x:Name="title_p_neu" Height="20"  Margin="0,19,0,5" Grid.Row="2" TextAlignment="Center" Visibility="Hidden" HorizontalAlignment="Center" VerticalAlignment="Center" Width="532"/>
     </Grid>
 </Window>

@@ -15,10 +15,10 @@ __author__ = "Menghui Zhang"
 logger = script.get_logger()
 output = script.get_output()
 bb_config = script.get_config()
-
-from pyIGF_logInfo import getlog
-getlog(__title__)
-
+try:
+    from IGF_log import getlog
+    getlog(__title__)
+except:pass
 uidoc = revit.uidoc
 doc = revit.doc
 

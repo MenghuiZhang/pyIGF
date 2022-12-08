@@ -1,11 +1,8 @@
 # coding: utf8
-import sys
-
-sys.path.append(r'R:\pyRevit\xx_Skripte\libs\IGF_libs')
 from rpw import revit, DB
 from pyrevit import script, forms
 from IGF_log import getlog
-from IGF_libKopie import get_value
+from IGF_lib import get_value
 
 __title__ = "2.10 Heizlast & Heizleistung MEP Räume"
 __doc__ = """berechnet Heizlast und Heizleistung von MEP Räume

@@ -24,6 +24,9 @@ class ANZEIGEN(IExternalEventHandler):
             TaskDialog.Show('Fehler','keine IFC-GUID') 
             return
         try:
+            print(DB.FilteredElementCollector(doc).WherePasses(self.ifcfilter(self.ifcguid)).WhereElementIsNotElementType().ToElementIds().Count)
+            for el in DB.FilteredElementCollector(doc).WherePasses(self.ifcfilter(self.ifcguid)).WhereElementIsNotElementType().ToElementIds():
+                print(el)
             elemid = DB.FilteredElementCollector(doc).WherePasses(self.ifcfilter(self.ifcguid)).WhereElementIsNotElementType().ToElementIds()[0]
             elem = doc.GetElement(elemid)
         except:
@@ -56,6 +59,9 @@ class SELECT(IExternalEventHandler):
             TaskDialog.Show('Fehler','keine IFC-GUID') 
             return
         try:
+            print(DB.FilteredElementCollector(doc).WherePasses(self.ifcfilter(self.ifcguid)).WhereElementIsNotElementType().ToElementIds().Count)
+            for el in DB.FilteredElementCollector(doc).WherePasses(self.ifcfilter(self.ifcguid)).WhereElementIsNotElementType().ToElementIds():
+                print(el)
             elemid = DB.FilteredElementCollector(doc).WherePasses(self.ifcfilter(self.ifcguid)).WhereElementIsNotElementType().ToElementIds()[0]
             elem = doc.GetElement(elemid)
         except:

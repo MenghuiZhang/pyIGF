@@ -1,10 +1,8 @@
 # coding: utf8
-import sys
-sys.path.append(r'R:\pyRevit\xx_Skripte\libs\IGF_libs')
 from IGF_log import getlog
-from rpw import revit, DB
+from rpw import revit, DB, UI
 from pyrevit import script, forms
-from IGF_libKopie import get_value
+from IGF_lib import get_value
 from System.Collections.ObjectModel import ObservableCollection
 from System.Windows import FontWeights, FontStyles
 from System.Windows.Media import Brushes, BrushConverter
@@ -32,7 +30,7 @@ berechnungsformel: IGF_K_ULK_Leistung/4200/(IGF_K_ULK-RL_Temp-IGF_K_ULK-VL_Temp)
 --------------------------
 
 [Version: 1.1]
-[2021.11.16]
+[2022.10.31]
 """
 
 __author__ = "Menghui Zhang"
@@ -46,16 +44,10 @@ name = doc.ProjectInformation.Name
 number = doc.ProjectInformation.Number
 config = script.get_config(name+number+'ULK-Familie')
 
-try:
-    getlog(__title__)
-except:
-    pass
+try:getlog(__title__)
+except:pass
 
-bauteile_collector = DB.FilteredElementCollector(doc).OfCategory(DB.BuiltInCategory.OST_MechanicalEquipment).WhereElementIsNotElementType()
-bauteile = bauteile_collector.ToElementIds()
-bauteile_collector.Dispose()
-
-phase = doc.Phases[0]
+bauteile = DB.FilteredElementCollector(doc).OfCategory(DB.BuiltInCategory.OST_MechanicalEquipment).WhereElementIsNotElementType().ToElementIds()
 
 HLS_Dict = {}
 HLS_Para_Dict = {}
@@ -67,157 +59,70 @@ for elid in bauteile:
         Paraliste = []
         for para in elem.Parameters:
             if not para.Definition.Name in Paraliste:
-                try:
-                    Paraliste.append(para.Definition.Name)
-                except:
-                    pass
+                try:Paraliste.append(para.Definition.Name)
+                except:pass
         HLS_Para_Dict[Family]=Paraliste
     else:
         HLS_Dict[Family].append(elem)
 
 class MechanicalEquipment(object):
-    def __init__(self,name):
+    def __init__(self,name,elems):
         self.Name = name
         self.Selectedindex = -1
         self.Paras = []
         self.checked = False
-
-    @property
-    def Name(self):
-        return self._Name
-    @Name.setter
-    def Name(self, value):
-        self._Name = value
-    @property
-    def Selectedindex(self):
-        return self._Selectedindex
-    @Selectedindex.setter
-    def Selectedindex(self, value):
-        self._Selectedindex = value
-    @property
-    def Paras(self):
-        return self._Paras
-    @Paras.setter
-    def Paras(self, value):
-        self._Paras = value
-    @property
-    def Para_dict(self):
-        return self._Para_dict
-    @Para_dict.setter
-    def Para_dict(self, value):
-        self._Para_dict = value
-    @property
-    def checked(self):
-        return self._checked
-    @checked.setter
-    def checked(self, value):
-        self._checked = value
-    @property
-    def Para_id_dict(self):
-        return self._Para_id_dict
-    @Para_id_dict.setter
-    def Para_id_dict(self, value):
-        self._Para_id_dict = value
-
-class select(object):
-    def __init__(self,n,param):
-        self.selectId = n
-        self.ParaName = param
-
-    @property
-    def ParaName(self):
-        return self._ParaName
-    @ParaName.setter
-    def ParaName(self, value):
-        self._ParaName = value
-    @property
-    def selectId(self):
-        return self._selectId
-    @selectId.setter
-    def selectId(self, value):
-        self._selectId = value
+        self.elems = elems
 
 Liste_ULK = ObservableCollection[MechanicalEquipment]()
 
-ULKName = HLS_Para_Dict.keys()[:]
-ULKName.sort()
-
-for elem in ULKName:
-    temp = MechanicalEquipment(elem)
-    params = HLS_Para_Dict[elem][:]
-    params.sort()
-    para_Liste = []
-    para_dict = {}
-    para_id_dict = {}
-    for n,para in enumerate(params):
-        temp_para = select(n,para)
-        para_dict[n] = para
-        para_id_dict[para] = n
-        para_Liste.append(temp_para)
-    temp.Paras = para_Liste
-    temp.Para_dict = para_dict
-    temp.Para_id_dict = para_id_dict
+for name in sorted(HLS_Dict.keys()):
+    temp = MechanicalEquipment(name,HLS_Dict[name])
+    params = HLS_Para_Dict[name][:]
+    temp.Paras = sorted(params)
     Liste_ULK.Add(temp)
 
-
 class ULK_Familie(forms.WPFWindow):
-    def __init__(self, xaml_file_name,Liste_ULK):
+    def __init__(self):
         self.Liste_ULK = Liste_ULK
-        forms.WPFWindow.__init__(self, xaml_file_name)
+        forms.WPFWindow.__init__(self, "window.xaml")
         self.tempcoll = ObservableCollection[MechanicalEquipment]()
         self.altdatagrid = Liste_ULK
         self.dataGrid.ItemsSource = Liste_ULK
         self.read_config()
+        self.start = False
     
     def click(self,button):
         button.Background = BrushConverter().ConvertFromString("#FF707070")
         button.FontWeight = FontWeights.Bold
         button.FontStyle = FontStyles.Italic
+
     def back(self,button):
         button.Background  = Brushes.White
         button.FontWeight = FontWeights.Normal
         button.FontStyle = FontStyles.Normal
-        
+
     
     def read_config(self):
         try:
             ULK_dict = config.ULK_dict
             for item in self.Liste_ULK:
                 if item.Name in ULK_dict.keys():
-                    try:
-                        item.checked = ULK_dict[item.Name][0]
-                    except:
-                        pass
-                    try:
-                        item.Selectedindex = item.Para_id_dict[ULK_dict[item.Name][1]]
-                    except:
-                        pass
+                    try:item.checked = True
+                    except:pass
+                    try:item.Selectedindex = item.Paras.index(ULK_dict[item.Name])
+                    except:item.Selectedindex = -1
             self.dataGrid.Items.Refresh()
          
         except:
-            pass
-
-        try:
-            if config.Hide:
-                self.click(self.aus)
-                for item in self.dataGrid.Items:
-                    if item.checked:
-                        self.tempcoll.Add(item)
-                self.dataGrid.ItemsSource = self.tempcoll
-                self.dataGrid.Items.Refresh()
-            else:
-                self.click(self.ein)
-                   
-        except:
-            pass
-        
+            pass        
         
     def write_config(self):
         dict_ = {}
         for item in self.Liste_ULK:
             if item.checked:
                 try:
-                    dict_[item.Name] = [item.checked,item.Para_dict[item.Selectedindex]]
+                    if item.Selectedindex != -1:
+                        dict_[item.Name] = item.Paras[item.Selectedindex]
                 except:
                     pass
 
@@ -226,6 +131,11 @@ class ULK_Familie(forms.WPFWindow):
 
     def ok(self,sender,args):
         self.write_config()
+        for el in self.Liste_ULK:
+            if el.checked and el.Selectedindex == -1:
+                UI.TaskDialog.Show('Fehler','Bitte Kühlleitung-Parameter auswählen!')
+                return
+        self.start = True
         self.Close()
 
     def hide(self,sender,args):
@@ -234,13 +144,11 @@ class ULK_Familie(forms.WPFWindow):
             if item.checked:
                 self.tempcoll.Add(item)
         self.dataGrid.ItemsSource = self.tempcoll
-        config.Hide = True
         self.click(self.aus)
         self.back(self.ein)
 
     def show(self,sender,args):
         self.dataGrid.ItemsSource = self.altdatagrid
-        config.Hide = False
         self.click(self.ein)
         self.back(self.aus)
 
@@ -248,35 +156,41 @@ class ULK_Familie(forms.WPFWindow):
         self.Close()
         script.exit()
     
-ULK_Familie_Auswahl = ULK_Familie("window.xaml",Liste_ULK)
+ULK_Familie_Auswahl = ULK_Familie()
 try:
     ULK_Familie_Auswahl.ShowDialog()
 except Exception as e:
+    logger.error(e)
     ULK_Familie_Auswahl.Close()
     script.exit()
 
-Familie_Bearbeiten = {}
+if ULK_Familie_Auswahl.start == False:
+    script.exit()
+
+Familie = []
 for el in Liste_ULK:
     if el.checked:
-        for elem in HLS_Dict[el.Name]:
-            Familie_Bearbeiten[elem] = el.Para_dict[el.Selectedindex]
+        Familie.append(el)
 
-if len(Familie_Bearbeiten.keys()) == 0:
+if len(Familie) == 0:
+    UI.TaskDialog.Show('Fehler','Keine ULK-Familie ausgewählt!')
     script.exit()
 
 class Umluftkuehler:
     def __init__(self, elem, param):
-        self.element = elem
+        self.elem = elem
         self.param = param
+        if self.Muster_Pruefen():
+            return
         try:
-            self.RaumNr = self.element.Space[phase].Number
-            self.Raum = self.element.Space[phase].Id.ToString()
+            self.RaumNr = self.elem.Space[doc.GetElement(self.elem.CreatedPhaseId)].Number
+            self.Raum = self.elem.Space[doc.GetElement(self.elem.CreatedPhaseId)].Id.ToString()
         except:
             self.RaumNr = ''
             self.Raum = ''
-            logger.error('kein MEP-Raum für Element {} gefunden'.format(self.element.Id.ToString()))
+            logger.error('kein MEP-Raum für Element {} gefunden'.format(self.elem.Id.ToString()))
         try:
-            self.leistung = get_value(self.element.LookupParameter(self.param))
+            self.leistung = get_value(self.elem.LookupParameter(self.param))
         except:
             self.leistung = 0
             logger.error("Parameter {} konnte nicht gefunden werden".format(self.param))
@@ -284,8 +198,16 @@ class Umluftkuehler:
         self.RL_Temp = ''
         self.Temperaturermittelung()
     
+    def Muster_Pruefen(self):
+        '''prüft, ob der Bauteil sich in Musterbereich befindet.'''
+        try:
+            bb = self.elem.LookupParameter('Bearbeitungsbereich').AsValueString()
+            if bb == 'KG4xx_Musterbereich':return True
+            else:return False
+        except:return False
+    
     def Temperaturermittelung(self):
-        conns = self.element.MEPModel.ConnectorManager.Connectors
+        conns = self.elem.MEPModel.ConnectorManager.Connectors
         for conn in conns:
             if conn.IsConnected:
                 system  = conn.MEPSystem
@@ -293,7 +215,7 @@ class Umluftkuehler:
                     typ = doc.GetElement(system.get_Parameter(DB.BuiltInParameter.ELEM_TYPE_PARAM).AsElementId())
                     try:
                         abk = typ.LookupParameter('Abkürzung').AsString()
-                        temp = get_value(typ.LookupParameter('Temperatur von Medium'))
+                        temp = typ.LookupParameter('Temperatur von Medium').AsDouble() - 273.15
                         if abk == 'K VL':
                             self.VL_Temp = temp
                         elif abk == 'K RL':
@@ -303,35 +225,40 @@ class Umluftkuehler:
 
 
 MEP_Dict = {}
-ulkfamilieliste = Familie_Bearbeiten.keys()[:]
 
 with forms.ProgressBar(title='{value}/{max_value} Umluftkühler', cancellable=True, step=10) as pb:
-    for n, ulk in enumerate(ulkfamilieliste):
-        if pb.cancelled:
-            script.exit()
-        pb.update_progress(n + 1, len(ulkfamilieliste))
-        umluft = Umluftkuehler(ulk,Familie_Bearbeiten[ulk])
-        if umluft.Raum:
-            if umluft.Raum not in MEP_Dict.keys():
-                MEP_Dict[umluft.Raum] = [umluft]
-            else:
-                MEP_Dict[umluft.Raum].append(umluft)
+    for n, ulk in enumerate(Familie):
+        pb.title='{value}/{max_value} Exemplare von ' + ulk.Name + ' --- ' + str(n+1) + ' / '+ str(len(Familie)) + 'Familien'
+        for n1, elem in enumerate(ulk.elems):
+            if pb.cancelled:
+                script.exit()
+            pb.update_progress(n1 + 1, len(ulk.elems))
+            umluft = Umluftkuehler(elem,ulk.Paras[ulk.Selectedindex])
+            if not umluft.Muster_Pruefen():
+                if umluft.Raum:
+                    if umluft.Raum not in MEP_Dict.keys():
+                        MEP_Dict[umluft.Raum] = [umluft]
+                    else:
+                        MEP_Dict[umluft.Raum].append(umluft)
+                
 
 class MEPRaum:
     def __init__(self, elemid, liste_ulk):
-        self.element = doc.GetElement(DB.ElementId(int(elemid)))
+        self.elem = doc.GetElement(DB.ElementId(int(elemid)))
         self.ulk_liste = liste_ulk
         self.leistung = 0
-        self.VL_temp = -200
-        self.RL_temp = -200
+        self.VL_Temp = 0
+        self.RL_Temp = 0
         self.Wasser = 0
-        self.leistungberechnen()
-        self.Tempberechnen()
-        self.Wassermengenberechnen()
+        if len(self.ulk_liste) > 0:
+            self.leistungberechnen()
+            self.Tempberechnen()
+            self.Wassermengenberechnen()
 
     def leistungberechnen(self):
         for item in self.ulk_liste:
             self.leistung += item.leistung
+
     def Tempberechnen(self):
         liste_VL = []
         liste_RL = []
@@ -344,39 +271,40 @@ class MEPRaum:
             self.VL_Temp = liste_VL[0]
         else:
             logger.error(50*'-')
-            logger.error('Vorlauftemperatur von ULK in MEPRaum {}, {} nicht gleich'.format(self.element.Number,self.element.Id.ToString()))
+            logger.error('Vorlauftemperatur von ULK in MEPRaum {}, {} nicht gleich'.format(self.elem.Number,self.elem.Id.ToString()))
             for el in self.ulk_liste:
                 logger.error('Vorlauftemperatur: {} °C, ULK-Id: {}'.format(el.VL_Temp,el.element.Id.ToString()))
             liste_VL_neu = [float(a) for a in liste_VL]
             self.VL_Temp = min(liste_VL_neu)
-            logger.error('!!! Achtung: ULK-Vorlauftemperatur in MEPRaum {}, {} wird auf {} °C eingesetzt'.format(self.element.Number,self.element.Id.ToString(),self.VL_Temp))
+            logger.error('!!! Achtung: ULK-Vorlauftemperatur in MEPRaum {}, {} wird auf {} °C eingesetzt'.format(self.elem.Number,self.elem.Id.ToString(),self.VL_Temp))
             logger.error(50*'-')
 
         if len(liste_RL) == 1:
             self.RL_Temp = liste_RL[0]
         else:
             logger.error(50*'-')
-            logger.error('Rücklauftemperatur von ULK in MEPRaum {}, {} nicht gleich'.format(self.element.Number,self.element.Id.ToString()))
+            logger.error('Rücklauftemperatur von ULK in MEPRaum {}, {} nicht gleich'.format(self.elem.Number,self.elem.Id.ToString()))
             for el in self.ulk_liste:
                 logger.error('Rücklauftemperatur: {} °C, ULK-Id: {}'.format(el.RL_Temp,el.element.Id.ToString()))
             liste_RL_neu = [float(a) for a in liste_RL]
             self.RL_Temp = max(liste_RL_neu)
-            logger.error('!!! Achtung: ULK-Rücklauftemperatur in MEPRaum {}, {} wird auf {} °C eingesetzt'.format(self.element.Number,self.element.Id.ToString(),self.RL_Temp))
+            logger.error('!!! Achtung: ULK-Rücklauftemperatur in MEPRaum {}, {} wird auf {} °C eingesetzt'.format(self.elem.Number,self.elem.Id.ToString(),self.RL_Temp))
             logger.error(50*'-')
 
     def Wassermengenberechnen(self):
-        if self.VL_temp == -200 or self.RL_Temp == -200:
-            self.VL_temp = 0
-            self.RL_Temp = 0
+        if self.VL_Temp == 0 or self.RL_Temp == 0:
             return
         else:
-            self.Wasser = self.leistung / 4200.0 / abs(self.RL_Temp - self.VL_Temp)
+            try:self.Wasser = self.leistung / 4200.0 / abs(self.RL_Temp - self.VL_Temp)
+            except Exception as e:
+                print(self.RL_Temp,self.VL_Temp)
+                self.Wasser = 0
     
     def werte_schreiben(self):
         """Schreibt die berechneten Werte zurück in das Modell."""
         def wert_schreiben(param_name, wert):
             if not wert is None:
-                param = self.element.LookupParameter(param_name)
+                param = self.elem.LookupParameter(param_name)
                 if param:
                     if param.StorageType.ToString() == 'Double':
                         param.SetValueString(str(wert))
@@ -391,13 +319,18 @@ class MEPRaum:
     
 
 mep_liste = []
-MEP_Liste = MEP_Dict.keys()[:]
+
+MEP_Raum_Liste = [e.ToString() for e in DB.FilteredElementCollector(doc).OfCategory(DB.BuiltInCategory.OST_MEPSpaces).ToElementIds()]
+
 with forms.ProgressBar(title='{value}/{max_value} MEP-Räume',cancellable=True, step=10) as pb1:
-    for n, mep in enumerate(MEP_Liste):
+    for n, mep in enumerate(MEP_Raum_Liste):
         if pb1.cancelled:
             script.exit()
-        pb1.update_progress(n + 1, len(MEP_Liste))
-        mepraum = MEPRaum(mep,MEP_Dict[mep])
+        pb1.update_progress(n + 1, len(MEP_Raum_Liste))
+        if mep in MEP_Dict.keys():
+            mepraum = MEPRaum(mep,MEP_Dict[mep])
+        else:
+            mepraum = MEPRaum(mep,[])
         mep_liste.append(mepraum)
 
 

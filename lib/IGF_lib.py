@@ -216,15 +216,18 @@ def CreateSharedParam_2020(Gruppe = 'TemporaryDefintionGroup', Name = None, Disz
     app = revit.app
     file = app.OpenSharedParameterFile()
     DefiCrea = CreateDefinition_2020(Name = Name, Disziplin = Disziplin, Typ = Typ, Info = Info, GUID = GUID)
+    
     try:
         sharedPara = file.Groups[Gruppe].Definitions.Create(DefiCrea)
         return sharedPara
-    except:
-        try:
-            sharedPara = file.Groups.Create(Gruppe).Definitions.Create(DefiCrea)
-            return sharedPara
-        except:
-            return
+    except Exception as e:
+        print(e)
+        # try:
+        #     sharedPara = file.Groups.Create(Gruppe).Definitions.Create(DefiCrea)
+        #     return sharedPara
+        # except Exception as e:
+        #     # print(e)
+        #     return sharedPara
 
 
 def CreateProjParam_2020(Name = None, Disziplin = None, Parametertyp = None, Info = None, Gruppe = None, Kategorien = 'Allgemeines Modell', Typ_Exemplar = 'Typ'):
@@ -265,7 +268,6 @@ def CreateProjParam_2020(Name = None, Disziplin = None, Parametertyp = None, Inf
     except Exception as e:
         print(e)
 
-
 def CreateProjFromSharedParam_2020(ExternalDefinition = None, Gruppe = None, Kategorien = None, Typ_Exemplar = None):
     uiapp = revit.uiapp
     app = revit.app
@@ -293,10 +295,8 @@ def CreateProjFromSharedParam_2020(ExternalDefinition = None, Gruppe = None, Kat
         ParaGroup = AllParameterGroup_2020()[Gruppe]
 
     map = uiapp.ActiveUIDocument.Document.ParameterBindings
-    try:
-        map.Insert(ExternalDefinition, binding, ParaGroup)
-    except:
-        return
+    map.Insert(ExternalDefinition, binding, ParaGroup)
+
 
 
 
@@ -477,7 +477,6 @@ def AllProjectParams_2022():
             pass
     return _ProjectParams,_ProjectParam_defis
 
-
 def CreateDefinition_2022(Name = None, Disziplin = None, Typ = None, Info = None, GUID = None):
     try:
         ForgeTypeId = AllParameterType_2022()[Disziplin][Typ]
@@ -495,17 +494,10 @@ def CreateSharedParam_2022(Gruppe = 'TemporaryDefintionGroup', Name = None, Disz
     app = revit.app
     file = app.OpenSharedParameterFile()
     DefiCrea = CreateDefinition_2022(Name = Name, Disziplin = Disziplin, Typ = Typ, Info = Info, GUID = GUID)
-    print(DefiCrea.GUID)
-    print('True')
     try:
         sharedPara = file.Groups[Gruppe].Definitions.Create(DefiCrea)
         return sharedPara
-    except:
-        try:
-            sharedPara = file.Groups.Create(Gruppe).Definitions.Create(DefiCrea)
-            return sharedPara
-        except:
-            return 
+    except:return
 
 def CreateProjParam_2022(Name = None, Disziplin = None, Parametertyp = None, Info = None, Gruppe = None, Kategorien = 'Allgemeines Modell', Typ_Exemplar = 'Typ'):
     app = revit.app
@@ -540,16 +532,9 @@ def CreateProjParam_2022(Name = None, Disziplin = None, Parametertyp = None, Inf
 
     map = revit.uiapp.ActiveUIDocument.Document.ParameterBindings
     if ParaGroup:
-        try:
-            map.Insert(ExternalDefinition, binding, ParaGroup)
-        except:
-            return
+        map.Insert(ExternalDefinition, binding, ParaGroup)
     else:
-        try:
-            map.Insert(ExternalDefinition, binding)
-        except:
-            return
-
+        map.Insert(ExternalDefinition, binding)
 
 def CreateProjFromSharedParam_2022(ExternalDefinition = None, Gruppe = None, Kategorien = None, Typ_Exemplar = None):
     app = revit.app

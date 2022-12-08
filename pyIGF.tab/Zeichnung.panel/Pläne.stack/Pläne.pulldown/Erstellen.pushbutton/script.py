@@ -357,6 +357,9 @@ planname_temp =  ObservableCollection[str]()
 
 for viewid in view_liste:
     elem = doc.GetElement(viewid)
+    nummer = elem.get_Parameter(DB.BuiltInParameter.VIEWPORT_SHEET_NUMBER).AsString()
+    if nummer:
+        continue
     tempclass = Views(viewid)
     tempclass.ansichtname = elem.Name
 

@@ -4,6 +4,9 @@ import Autodesk.Revit.DB as DB
 from pyrevit import revit,forms
 from System.Collections.Generic import List
 from System.Collections.ObjectModel import ObservableCollection
+import math
+
+
 
 ISO_Rohr = {}
 
@@ -100,19 +103,30 @@ class Bauteil(object):
                 return
 
             if ISO_Dicke.find('%') != -1:
-                durch = self.elem.LookupParameter('Außendurchmesser').AsDouble()
+                durch = self.elem.LookupParameter('Außendurchmesser').AsDouble()*304.8
                 pro = ISO_Dicke[:ISO_Dicke.find('%')]
-                dicke = int(pro) / 100.0
-                dicke_neu = int(round(dicke*durch*304.8))/10
-                if dicke_neu*10 < dicke*durch*304.8:
-                    dicke_neu = dicke_neu+1
-                if int(pro) < dicke_neu*10:
-                    self.ISO_Dicke = int(pro)*10/304.8
+           
+                if durch < 28:
+                    dicke_temp = 20
+                elif durch < 42:
+                    dicke_temp = 30
+                elif durch < 48:
+                    dicke_temp = 40
+                elif durch < 54:
+                    dicke_temp = 50
+                elif durch < 70:
+                    dicke_temp = 60
+                elif durch < 76:
+                    dicke_temp = 70
+                elif durch < 89:
+                    dicke_temp = 80
                 else:
-                    self.ISO_Dicke = dicke_neu*10/304.8
+                    dicke_temp = 100
+                dicke_temp_neu = dicke_temp*int(pro)/1000.0
+                self.ISO_Dicke = math.ceil(dicke_temp_neu)/30.48
                 return
 
-        if self.elem.Category.Id.ToString() == '-2008049':
+        if self.elem.Category.Id.ToString() in ['-2008049','-2008055']:
             if ISO_Art not in self.ISO_Rohr.keys():
                 print('Rohrdämmung {} nicht vorhanden'.format(ISO_Art))
                 return
@@ -122,7 +136,7 @@ class Bauteil(object):
                 return
             if ISO_Dicke.find('%') != -1:
                 pro = ISO_Dicke[:ISO_Dicke.find('%')]
-                dicke = int(pro) / 100.0
+        
                 conns = self.elem.MEPModel.ConnectorManager.Connectors
                 if conns:
                     conn = {}
@@ -131,22 +145,37 @@ class Bauteil(object):
                             conn[int(temp.Radius*304.8*2)] = [temp]
                         else:
                             conn[int(temp.Radius*304.8*2)].Add(temp)
-                    conns = conn[sorted(conn.keys())[-1]]
+                    conns = []
+                    for key in sorted(conn.keys()):
+                        for c in conn[key]:conns.insert(0,c)
+
                     for conn in conns:
                         refs = conn.AllRefs
                         for ref in refs:
                             owner = ref.Owner
                             if owner.Category.Id.ToString() in ['-2008044','-2008050']:
-                                durch = owner.LookupParameter('Außendurchmesser').AsDouble()
-                                dicke_neu = int(round(dicke*durch*304.8))/10
-                                if dicke_neu*10 < dicke*durch*304.8:
-                                    dicke_neu = dicke_neu+1
-                                if int(pro) < dicke_neu*10:
-                                    self.ISO_Dicke = int(pro)*10/304.8
+                                durch = owner.LookupParameter('Außendurchmesser').AsDouble()*304.8
+                                if durch < 28:
+                                    dicke_temp = 20
+                                elif durch < 42:
+                                    dicke_temp = 30
+                                elif durch < 48:
+                                    dicke_temp = 40
+                                elif durch < 54:
+                                    dicke_temp = 50
+                                elif durch < 70:
+                                    dicke_temp = 60
+                                elif durch < 76:
+                                    dicke_temp = 70
+                                elif durch < 89:
+                                    dicke_temp = 80
                                 else:
-                                    self.ISO_Dicke = dicke_neu*10/304.8
+                                    dicke_temp = 100
+                                dicke_temp_neu = dicke_temp*int(pro)/1000.0
+                                self.ISO_Dicke = math.ceil(dicke_temp_neu)/30.48
                                 return
-                    print('Dicke für Element {} kann nicht ermittelt werden. Grund: Formteil nicht mit Rohr verbunden'.format(self.elem.Id.ToString()))
+                            
+                    print('Dicke für Element {} kann nicht ermittelt werden. Grund: Formteil/Zubehör nicht mit Rohr verbunden'.format(self.elem.Id.ToString()))
                     return
                 print('Dicke für Element {} kann nicht ermittelt werden. Grund: Keine Connectors gefunden'.format(self.elem.Id.ToString()))
                 return             
@@ -156,15 +185,29 @@ class Bauteil(object):
             if self.ISO_Dicke_vorgeben_mm:
                 self.ISO_Dicke = float(self.ISO_Dicke_vorgeben_mm) / 304.8
                 return
-            durch = self.elem.LookupParameter('Außendurchmesser').AsDouble()
-            dicke_neu = int(round(float(self.ISO_Dicke_vorgeben_Pro)/100*durch*304.8))/10
-            if dicke_neu*10 < float(self.ISO_Dicke_vorgeben_Pro)/100*durch*304.8:
-                dicke_neu = dicke_neu+1
-            self.ISO_Dicke = dicke_neu*10/304.8
-            if dicke_neu*10 > float(self.ISO_Dicke_vorgeben_Pro):
-                self.ISO_Dicke = float(self.ISO_Dicke_vorgeben_Pro)/304.8
+            durch = self.elem.LookupParameter('Außendurchmesser').AsDouble()*304.8
+
+            if durch < 28:
+                dicke_temp = 20
+            elif durch < 42:
+                dicke_temp = 30
+            elif durch < 48:
+                dicke_temp = 40
+            elif durch < 54:
+                dicke_temp = 50
+            elif durch < 70:
+                dicke_temp = 60
+            elif durch < 76:
+                dicke_temp = 70
+            elif durch < 89:
+                dicke_temp = 80
+            else:
+                dicke_temp = 100
+            dicke_temp_neu = dicke_temp*int(self.ISO_Dicke_vorgeben_Pro)/1000.0
+            self.ISO_Dicke = math.ceil(dicke_temp_neu)/30.48
             return
-        elif self.elem.Category.Id.ToString() == '-2008049':
+            
+        elif self.elem.Category.Id.ToString() in ['-2008049','-2008055']:
             if self.ISO_Dicke_vorgeben_mm:
                 self.ISO_Dicke = float(self.ISO_Dicke_vorgeben_mm) / 304.8
                 return
@@ -176,22 +219,37 @@ class Bauteil(object):
                         conn[int(temp.Radius*304.8*2)] = [temp]
                     else:
                         conn[int(temp.Radius*304.8*2)].Add(temp)
-                conns = conn[sorted(conn.keys())[-1]]
+                conns = []
+                for key in sorted(conn.keys()):
+                    for c in conn[key]:conns.insert(0,c)
                 
                 for conn in conns:
                     refs = conn.AllRefs
                     for ref in refs:
                         owner = ref.Owner
                         if owner.Category.Id.ToString() in ['-2008044','-2008050']:
-                            durch = owner.LookupParameter('Außendurchmesser').AsDouble()
-                            dicke_neu = int(round(float(self.ISO_Dicke_vorgeben_Pro)/100*durch*304.8))/10
-                            if dicke_neu*10 < float(self.ISO_Dicke_vorgeben_Pro)/100*durch*304.8:
-                                dicke_neu = dicke_neu+1
-                            self.ISO_Dicke = dicke_neu*10/304.8
-                            if dicke_neu*10 > float(self.ISO_Dicke_vorgeben_Pro):
-                                self.ISO_Dicke = float(self.ISO_Dicke_vorgeben_Pro)/304.8
+                            durch = owner.LookupParameter('Außendurchmesser').AsDouble()*304.8
+                            if durch < 28:
+                                dicke_temp = 20
+                            elif durch < 42:
+                                dicke_temp = 30
+                            elif durch < 48:
+                                dicke_temp = 40
+                            elif durch < 54:
+                                dicke_temp = 50
+                            elif durch < 70:
+                                dicke_temp = 60
+                            elif durch < 76:
+                                dicke_temp = 70
+                            elif durch < 89:
+                                dicke_temp = 80
+                            else:
+                                dicke_temp = 100
+                            dicke_temp_neu = dicke_temp*int(self.ISO_Dicke_vorgeben_Pro)/1000.0
+                            self.ISO_Dicke = math.ceil(dicke_temp_neu)/30.48
                             return
-                print('Dicke für Element {} kann nicht ermittelt werden. Grund: Formteil nicht mit Rohr verbunden'.format(self.elem.Id.ToString()))
+                            
+                print('Dicke für Element {} kann nicht ermittelt werden. Grund: Formteil/Zubehör nicht mit Rohr verbunden'.format(self.elem.Id.ToString()))
                 return
             print('Dicke für Element {} kann nicht ermittelt werden. Grund: Keine Connectors gefunden'.format(self.elem.Id.ToString()))
             return
@@ -235,6 +293,7 @@ class ADDISO(IExternalEventHandler):
         self.rohr = False
         self.rohrformteil = False
         self.flexrohr = False
+        self.rohraccessory = False
     def Execute(self,app):
         uidoc = app.ActiveUIDocument
         doc = uidoc.Document
@@ -249,6 +308,9 @@ class ADDISO(IExternalEventHandler):
                     self.elems.append(elem)
                 elif elem.Category.Id.ToString() == '-2008050' and self.flexrohr:
                     self.elems.append(elem)
+                elif elem.Category.Id.ToString() == '-2008055' and self.rohraccessory:
+                    self.elems.append(elem)
+
 
         elif self.system:
             try:
@@ -259,6 +321,9 @@ class ADDISO(IExternalEventHandler):
                         if elem.MEPSystem.Id.ToString() == system.Id.ToString():
                             self.elems.append(elem)
                     elif elem.Category.Id.ToString() == '-2008049' and self.rohrformteil:
+                        if elem.LookupParameter('Systemname').AsString() == system.Name:
+                            self.elems.append(elem)
+                    elif elem.Category.Id.ToString() == '-2008055' and self.rohraccessory:
                         if elem.LookupParameter('Systemname').AsString() == system.Name:
                             self.elems.append(elem)
                     elif elem.Category.Id.ToString() == '-2008050' and self.flexrohr:
@@ -278,11 +343,14 @@ class ADDISO(IExternalEventHandler):
                         elif elem.Category.Id.ToString() == '-2008049' and self.rohrformteil:
                             if elem.LookupParameter('Systemname').AsString() == el.Name:
                                 self.elems.append(elem)
+                        elif elem.Category.Id.ToString() == '-2008055' and self.rohraccessory:
+                            if elem.LookupParameter('Systemname').AsString() == el.Name:
+                                self.elems.append(elem)
                         elif elem.Category.Id.ToString() == '-2008050' and self.flexrohr:
                             if elem.MEPSystem.Id.ToString() == el.Id.ToString():
                                 self.elems.append(elem)
         if self.elems.Count == 0:
-            TaskDialog.Show('Info','Keine Rohre/Rohrformteile gefunden')
+            TaskDialog.Show('Info','Keine Rohre/Rohrformteile/Flexrohre/Rohrzubehör gefunden')
             return
         
         for el in self.elems:
@@ -297,6 +365,8 @@ class ADDISO(IExternalEventHandler):
             else:
                 bauteil.get_ISO_Info_0()
             
+            if not bauteil.ISO_Dicke and bauteil.ISO_Art:
+                continue
             if self.vorhandenbearbeiten:
                 Liste.append(bauteil)
             else:
@@ -314,7 +384,7 @@ class ADDISO(IExternalEventHandler):
         t.Dispose()
 
     def GetName(self):
-        return "Dämmung erstellen/ampassen"
+        return "Dämmung erstellen/anpassen"
 
 class REMOVEISO(IExternalEventHandler):
     def __init__(self):
@@ -325,6 +395,7 @@ class REMOVEISO(IExternalEventHandler):
         self.rohr = False
         self.rohrformteil = False
         self.flexrohr = False
+        self.rohraccessory = False
     def Execute(self,app):
         uidoc = app.ActiveUIDocument
         doc = uidoc.Document
@@ -340,6 +411,8 @@ class REMOVEISO(IExternalEventHandler):
                     self.elems.append(elem)
                 elif elem.Category.Id.ToString() == '-2008050' and self.flexrohr:
                     self.elems.append(elem)
+                elif elem.Category.Id.ToString() == '-2008055' and self.rohraccessory:
+                    self.elems.append(elem)
 
         elif self.system:
             try:
@@ -354,6 +427,9 @@ class REMOVEISO(IExternalEventHandler):
                             self.elems.append(elem)
                     elif elem.Category.Id.ToString() == '-2008050' and self.flexrohr:
                         if elem.MEPSystem.Id.ToString() == system.Id.ToString():
+                            self.elems.append(elem)
+                    elif elem.Category.Id.ToString() == '-2008055' and self.rohraccessory:
+                        if elem.LookupParameter('Systemname').AsString() == system.Name:
                             self.elems.append(elem)
             except:
                 TaskDialog.Show('Fehler','Bitte Rohrsystem auswählen')
@@ -372,9 +448,12 @@ class REMOVEISO(IExternalEventHandler):
                         elif elem.Category.Id.ToString() == '-2008050' and self.flexrohr:
                             if elem.MEPSystem.Id.ToString() == system.Id.ToString():
                                 self.elems.append(elem)
+                        elif elem.Category.Id.ToString() == '-2008055' and self.rohraccessory:
+                            if elem.LookupParameter('Systemname').AsString() == system.Name:
+                                self.elems.append(elem)
 
         if self.elems.Count == 0:
-            TaskDialog.Show('Info','Keine Rohre/Rohrformteile gefunden')
+            TaskDialog.Show('Info','Keine Rohre/Rohrformteile/Flexrohre/Rohrzubehör gefunden')
             return
 
         Liste = []

@@ -1,6 +1,4 @@
 # coding: utf8
-import sys
-sys.path.append(r'R:\pyRevit\xx_Skripte\libs\IGF_libs')
 import clr
 clr.AddReference('AdWindows')
 from Autodesk.Windows import ComponentManager
@@ -22,37 +20,41 @@ class Children(object):
         self.parent = None
         self.expand = False
 
+DICT_ALLTABS = {}
+ITEMSSOURCE = ObservableCollection[Children]()
 
 def get_all_plugins():
-    """return all Plugins"""
-    dict_Module = {}
     all_module = ComponentManager.Ribbon.Tabs
     for modul in all_module:
         revit_obj = modul.GetType()
         if revit_obj.ToString() == 'Autodesk.Windows.RibbonTab':
-            dict_Module[modul.Title] = modul
-    return dict_Module
+            DICT_ALLTABS[modul.Title] = modul
 
-def get_itemssource(_dict):
+get_all_plugins()  
+
+def get_itemssource():
     """return Itemssorce für WPF"""
-    Liste_Tab = ObservableCollection[Children]()
-    for el in sorted(_dict.keys()):
-        tab = _dict[el]
-        Tab = Children(el,False,_dict[el])
-        dict_objs = {panel.Source.AutomationName:panel for panel in tab.Panels}
+    for el in sorted(DICT_ALLTABS.keys()):
+        tab = DICT_ALLTABS[el]
+        Tab = Children(el,True,DICT_ALLTABS[el])
+        dict_objs = {}
+        for panel in tab.Panels:
+            if panel.Source.Items.Count > 0:
+                dict_objs[panel.Source.AutomationName] = panel
+
         for sub_el in sorted(dict_objs.keys()):
             if el in ['pyIGF']:
                 if sub_el not in ['Einstellungen']:
-                    panel = Children(sub_el,False,dict_objs[sub_el])
+                    panel = Children(sub_el,True,dict_objs[sub_el])
                     panel.parent = Tab
                     Tab.children.Add(panel)
             else:
-                panel = Children(sub_el,False,dict_objs[sub_el])
+                panel = Children(sub_el,True,dict_objs[sub_el])
                 panel.parent = Tab
-                Tab.children.Add(panel)
-                
-        Liste_Tab.Add(Tab)
-    return Liste_Tab
+                Tab.children.Add(panel)          
+        ITEMSSOURCE.Add(Tab)
+
+get_itemssource()
 
 def change_icon(button = None, script = script):
     try:
@@ -93,13 +95,12 @@ def setup_tooltip(button = None,script = script):
     except:
         pass
 
-
 class WPF_UI(forms.WPFWindow):
-    def __init__(self,liste_module):
-        self.liste_module = liste_module
+    def __init__(self):
+        self.liste_module = ITEMSSOURCE
         self.config = script.get_config('Module ausblenden')
         forms.WPFWindow.__init__(self,op.join(FILES_DIR, 'window.xaml'))
-        self.treeView1.ItemsSource = liste_module
+        self.treeView1.ItemsSource = ITEMSSOURCE
         self.read_config()
         self.update()
 
@@ -107,15 +108,18 @@ class WPF_UI(forms.WPFWindow):
         try:
             hidetabs = self.config.hidetabs
             for el in self.liste_module:
-                if el.name in hidetabs:
+                if el.name not in hidetabs:
                     el.checked = True
                     for panel in el.children:
                         panel.checked = True
+                else:
+                    el.checked = False
+                    for panel in el.children:
+                        panel.checked = False
         except:
             try:
                 self.config.hidetabs = []
-            except:
-                pass
+            except:pass
         try:
             hidepanels = self.config.hidepanels
             if len(hidepanels.keys()) > 0:
@@ -123,14 +127,13 @@ class WPF_UI(forms.WPFWindow):
                     if el.name in hidepanels.keys():                 
                         for child in el.children:
                             if child.name in hidepanels[el.name]:
-                                child.checked = True
-
+                                child.checked = False
 
         except:
             try:
                 self.config.hidetabs = {}
-            except:
-                pass
+            except Exception as e:
+                print(e)
 
         self.treeView1.Items.Refresh()
 
@@ -138,24 +141,23 @@ class WPF_UI(forms.WPFWindow):
         try:
             hide_tabs = []
             for el in self.liste_module:
-                if el.checked and el.name not in ['pyIGF']:
+                if el.checked == False and el.name != 'pyIGF':
                     hide_tabs.append(el.name)
             self.config.hidetabs = hide_tabs
-        except:
-            pass
+        except:pass
 
         try:
             hide_panels = {}
             for el in self.liste_module:
-                if el.checked:
-                    if el.name in ['pyIGF']:
+                if el.checked is False:
+                    if el.name == 'pyIGF':
                         hide_panels[el.name] = []
                         for sub_el in el.children:
-                            if sub_el.checked:
+                            if sub_el.checked is False:
                                 hide_panels[el.name].append(sub_el.name)
                 else:
                     for sub_el in el.children:
-                        if sub_el.checked:
+                        if sub_el.checked is False:
                             if el.name not in hide_panels.keys():
                                 hide_panels[el.name] = [sub_el.name]
                             else:
@@ -228,8 +230,8 @@ class WPF_UI(forms.WPFWindow):
         self.Close()
         self.write_config()
 
-def run_wpf(Liste_Tab):
-    ui_tabs = WPF_UI(Liste_Tab)
+def run_wpf():
+    ui_tabs = WPF_UI()
     try:
         ui_tabs.ShowDialog()
     except Exception as e:
@@ -247,26 +249,26 @@ def set_visible(item,visible):
     except:
         pass
 
-def setup_plugins(all_plugins):
-    for el in all_plugins:
-        if el.checked:
-            if el.name not in ['pyIGF']:
+def setup_plugins():
+    for el in ITEMSSOURCE:
+        if el.checked is False:
+            if el.name != 'pyIGF':
                 set_visible(el.object,False)
             else:
                 for item in el.children:
-                    if item.checked:
+                    if not item.checked:
                         set_visible(item.object,False)
                     else:
                         set_visible(item.object,True)
         else:
             set_visible(el.object,True)
             for item in el.children:
-                if item.checked:
+                if not item.checked:
                     set_visible(item.object,False)
                 else:
                     set_visible(item.object,True)
 
-def setup_plugins_init(all_plugins):
+def setup_plugins_init():
     config = script.get_config('Module ausblenden')
     try:
         hidden_tabs = config.hidetabs
@@ -276,7 +278,7 @@ def setup_plugins_init(all_plugins):
         hidden_panels = config.hidepanels
     except:
         hidden_panels = {}
-    for el in all_plugins:
+    for el in ITEMSSOURCE:
         if len(hidden_tabs) > 0:
             if el.name in hidden_tabs:
                 set_visible(el.object,False)
@@ -304,4 +306,4 @@ def setup_plugins_init(all_plugins):
                 else:
                     set_visible(el.object,True)
             else:
-                set_visible(el.object,True)
+                set_visible(el.object,True)             

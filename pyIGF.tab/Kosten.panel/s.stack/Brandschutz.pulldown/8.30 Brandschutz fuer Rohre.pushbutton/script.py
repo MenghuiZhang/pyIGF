@@ -318,7 +318,7 @@ with forms.ProgressBar(title='',cancellable=True, step=30) as pb2:
 t = DB.Transaction(doc,'Brandschott zählen')
 t.Start()
 if forms.alert('Anzahl schreiben?',yes=True,no=True,ok=False):
-    with forms.ProgressBar(title='{value}/{max_value} Luftkanäle und Luftkanalformteile',cancellable=True, step=int(len(liste_bauteile)/1000)+10) as pb3:
+    with forms.ProgressBar(title='{value}/{max_value} Rohre',cancellable=True, step=int(len(liste_bauteile)/1000)+10) as pb3:
         n = 0
         for systemtyp in dict_bauteile.keys():
             for elem in dict_bauteile[systemtyp]:

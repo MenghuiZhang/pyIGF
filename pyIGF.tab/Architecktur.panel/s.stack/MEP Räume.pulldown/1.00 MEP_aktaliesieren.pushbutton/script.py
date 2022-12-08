@@ -33,6 +33,8 @@ class MEPRaum:
         self.elemid = elemid
         self.elem = doc.GetElement(self.elemid)
         self.wert = self.elem.LookupParameter('Basisversatz').AsValueString()
+        self.flaeche = self.elem.LookupParameter('Fläche').AsDouble()
+        self.Vol = self.elem.LookupParameter('Volumen').AsDouble()
     
     def changebasisversatz(self):
         if self.wert == '1':
@@ -60,7 +62,8 @@ with forms.ProgressBar(title='{value}/{max_value} MEP-Räume', cancellable=True,
             script.exit()
         pb.update_progress(n + 1, len(MEPRaumIds))
         mepraum = MEPRaum(raum)
-        mepraumliste.append(mepraum)
+        if mepraum.flaeche < 0.001 or mepraum.Vol < 0.001:
+            mepraumliste.append(mepraum)
 
 if forms.alert('MEP-Räume aktualisieren?', ok=False, yes=True, no=True):
     with forms.ProgressBar(title='{value}/{max_value} MEP-Räume', cancellable=True, step=10) as pb1:
